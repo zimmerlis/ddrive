@@ -73,16 +73,19 @@ werden:
 dotnet publish <WPF_PROJECT_PATH> -f <WINDOWS_TFM> -c Release -r <WINDOWS_RUNTIME_IDENTIFIER> --self-contained true /p:UseWPF=true
 ```
 
-Dieser Beispielbefehl schließt die .NET-Runtime per `--self-contained true`
-mit ein. **Dokan** bleibt trotzdem eine externe Laufzeit- bzw.
-Installer-Abhängigkeit.
+Dieser schematische Beispielbefehl gilt nur für das **später angelegte
+WPF-App-Projekt**, nicht für den aktuellen Repository-Stand. Er schließt die
+.NET-Runtime per `--self-contained true` mit ein. **Dokan** bleibt trotzdem
+eine externe Laufzeit- bzw. Installer-Abhängigkeit.
 
 #### Packaging-Voraussetzungen
 
 Zusätzlich ist ein Installer-/Packaging-Schritt erforderlich, der mindestens
 die WPF-App und die benötigte **Dokan**-Voraussetzung gemeinsam ausliefert,
 z. B. per MSI, WiX oder Inno Setup. Der Runtime-Identifier richtet sich dabei
-nach der Zielplattform, typischerweise `win-x64` oder `win-arm64`.
+nach der Zielplattform, typischerweise `win-x64` oder `win-arm64`. Die
+gewählte Installer-/Runtime-Architektur muss dabei zur eingesetzten
+**Dokan**-Paketarchitektur passen.
 
 ## Empfohlene Architektur
 
