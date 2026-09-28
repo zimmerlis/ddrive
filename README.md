@@ -54,7 +54,7 @@ Windows-Desktop-App, also z. B. mit `net8.0-windows` und `UseWPF=true`,
 konfiguriert sein. Beispiel für x64:
 
 ```powershell
-dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true
+dotnet publish .\src\dDrive.App\dDrive.App.csproj -f net8.0-windows -c Release -r win-x64 --self-contained true /p:UseWPF=true /p:PublishSingleFile=true
 ```
 
 ## Empfohlene Architektur
