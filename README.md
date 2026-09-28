@@ -70,6 +70,10 @@ Beispielhafter Publish-Befehl für ein späteres x64-WPF-App-Projekt:
 dotnet publish .\<pfad-zum-wpf-projekt>\dDrive.App.csproj -f net8.0-windows -c Release -r win-x64 --self-contained true /p:UseWPF=true /p:PublishSingleFile=true
 ```
 
+Danach ist zusätzlich ein Installer-/Packaging-Schritt erforderlich, der
+mindestens die WPF-App und die benötigte **Dokan**-Voraussetzung gemeinsam
+ausliefert, z. B. per MSI, WiX oder Inno Setup.
+
 ## Empfohlene Architektur
 
 ### Komponenten
