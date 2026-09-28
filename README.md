@@ -47,7 +47,9 @@ Fehlerbehandlung selbst.
 #### Aktueller Repository-Status
 
 Das Repository enthält aktuell noch **kein buildbares WPF-Projekt**. Die
-folgenden Angaben beschreiben die geplante spätere Umsetzung.
+folgenden Angaben beschreiben die geplante spätere Umsetzung. Der aktuelle
+Stand besteht im Wesentlichen aus Projekt- und Architektur-Dokumentation,
+nicht aus bereits ausführbarem Anwendungscode.
 
 #### Geplante WPF-Projekteinstellungen
 
