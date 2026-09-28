@@ -65,11 +65,12 @@ konfiguriert sein. Beispielhafte `.csproj`-Konfiguration:
 
 #### Geplanter Publish-Schritt
 
-Ein späteres x64-WPF-App-Projekt kann z. B. per PowerShell so veröffentlicht
+Ein späteres x64-WPF-App-Projekt kann schematisch z. B. so veröffentlicht
 werden:
 
 ```powershell
-dotnet publish .\<pfad-zum-wpf-projekt>\dDrive.App.csproj -f net8.0-windows -c Release -r win-x64 --self-contained true /p:UseWPF=true
+# requires: Microsoft.NET.Sdk.WindowsDesktop, net8.0-windows, UseWPF=true
+dotnet publish <WPF_PROJECT.csproj> -f net8.0-windows -c Release -r win-x64 --self-contained true /p:UseWPF=true
 ```
 
 Dieser Beispielbefehl schließt die .NET-Runtime per `--self-contained true`
