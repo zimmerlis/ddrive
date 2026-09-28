@@ -43,18 +43,16 @@ Fehlerbehandlung selbst.
 
 ### 3. Gute Build- und Release-Pipeline
 
-Die App kann als eigenständige EXE veröffentlicht werden. Der Runtime-Identifier
-richtet sich nach der Zielplattform, typischerweise `win-x64` oder `win-arm64`.
-Die Anwendung selbst kann als Single-File-EXE gebaut werden; **Dokan** bleibt
-dabei aber eine separate Laufzeit- bzw. Installer-Abhängigkeit. Der folgende
-Publish-Befehl beschreibt nur das Managed-App-Artefakt; für eine WPF-Tray-App
-mit Dokan wird zusätzlich ein Installer bzw. Packaging-Schritt für die
-notwendigen Voraussetzungen benötigt. Das Projekt selbst sollte dafür als
-Windows-Desktop-App, also z. B. mit dem `Microsoft.NET.Sdk.WindowsDesktop`,
-`net8.0-windows` und `UseWPF=true`, konfiguriert sein. Diese Einstellungen sind
-eine **geplante Anforderung** für das spätere WPF-Projekt in diesem Repository,
-nicht der aktuelle Stand. **Sie greifen erst, nachdem das geplante WPF-Projekt
-im Repository angelegt wurde.** Beispielhafte `.csproj`-Konfiguration:
+#### Aktueller Repository-Status
+
+Das Repository enthält aktuell noch **kein buildbares WPF-Projekt**. Die
+folgenden Angaben beschreiben die geplante spätere Umsetzung.
+
+#### Geplante WPF-Projekteinstellungen
+
+Das spätere App-Projekt sollte als Windows-Desktop-App, also z. B. mit dem
+`Microsoft.NET.Sdk.WindowsDesktop`, `net8.0-windows` und `UseWPF=true`,
+konfiguriert sein. Beispielhafte `.csproj`-Konfiguration:
 
 ```xml
 <Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
@@ -65,16 +63,25 @@ im Repository angelegt wurde.** Beispielhafte `.csproj`-Konfiguration:
 </Project>
 ```
 
-Beispielhafter Publish-Befehl für ein späteres x64-WPF-App-Projekt in
-PowerShell:
+#### Geplanter Publish-Schritt
+
+Ein späteres x64-WPF-App-Projekt kann z. B. per PowerShell so veröffentlicht
+werden:
 
 ```powershell
 dotnet publish .\<pfad-zum-wpf-projekt>\dDrive.App.csproj -f net8.0-windows -c Release -r win-x64 --self-contained true /p:UseWPF=true
 ```
 
-Danach ist zusätzlich ein Installer-/Packaging-Schritt erforderlich, der
-mindestens die WPF-App und die benötigte **Dokan**-Voraussetzung gemeinsam
-ausliefert, z. B. per MSI, WiX oder Inno Setup.
+Dieser Beispielbefehl schließt die .NET-Runtime per `--self-contained true`
+mit ein. **Dokan** bleibt trotzdem eine externe Laufzeit- bzw.
+Installer-Abhängigkeit.
+
+#### Packaging-Voraussetzungen
+
+Zusätzlich ist ein Installer-/Packaging-Schritt erforderlich, der mindestens
+die WPF-App und die benötigte **Dokan**-Voraussetzung gemeinsam ausliefert,
+z. B. per MSI, WiX oder Inno Setup. Der Runtime-Identifier richtet sich dabei
+nach der Zielplattform, typischerweise `win-x64` oder `win-arm64`.
 
 ## Empfohlene Architektur
 
