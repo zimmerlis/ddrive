@@ -72,7 +72,7 @@ Ein späteres x64-WPF-App-Projekt kann schematisch z. B. so veröffentlicht
 werden:
 
 ```text
-dotnet publish <WPF_PROJECT_PATH> -f <WINDOWS_TFM> -c Release -r <WINDOWS_RUNTIME_IDENTIFIER> --self-contained true /p:UseWPF=true
+dotnet publish <WPF_PROJECT_PATH> -f <WINDOWS_TFM> -c Release -r win-x64 --self-contained true /p:UseWPF=true
 ```
 
 Dieser schematische Beispielbefehl gilt nur für das **später angelegte
