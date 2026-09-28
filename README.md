@@ -46,8 +46,10 @@ Fehlerbehandlung selbst.
 Die App kann als eigenständige EXE veröffentlicht werden. Der Runtime-Identifier
 richtet sich nach der Zielplattform, typischerweise `win-x64` oder `win-arm64`.
 Die Anwendung selbst kann als Single-File-EXE gebaut werden; **Dokan** bleibt
-dabei aber eine separate Laufzeit- bzw. Installer-Abhängigkeit. Beispiel für
-x64:
+dabei aber eine separate Laufzeit- bzw. Installer-Abhängigkeit. Der folgende
+Publish-Befehl beschreibt nur das Managed-App-Artefakt; für eine WPF-Tray-App
+mit Dokan wird zusätzlich ein Installer bzw. Packaging-Schritt für die
+notwendigen Voraussetzungen benötigt. Beispiel für x64:
 
 ```powershell
 dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true
