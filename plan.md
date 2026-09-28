@@ -140,7 +140,7 @@ werden können.
 
 **Ergebnis:** lokal installierbare EXE/Installer-Auslieferung.
 
-## Empfohlene Reihenfolge für deine lokale Arbeit in VSCode
+## Empfohlene Implementierungsreihenfolge
 
 1. Solution mit den Kernprojekten anlegen
 2. Core-Modelle und Konfigurationsmodell definieren

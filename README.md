@@ -1,6 +1,7 @@
 # ddrive
 
-dDrive ist als Windows-Utility für WebDAV-, FTP- und SFTP-Mounts geplant.
+dDrive ist als Windows-Utility für **WebDAV-, FTP- und SFTP-Laufwerke** unter
+Windows 10 und 11 geplant.
 
 ## Ziel
 
@@ -68,9 +69,8 @@ konfiguriert sein. Beispielhafte `.csproj`-Konfiguration:
 Ein späteres x64-WPF-App-Projekt kann schematisch z. B. so veröffentlicht
 werden:
 
-```powershell
-# requires: Microsoft.NET.Sdk.WindowsDesktop, net8.0-windows, UseWPF=true
-dotnet publish <WPF_PROJECT.csproj> -f net8.0-windows -c Release -r win-x64 --self-contained true /p:UseWPF=true
+```text
+dotnet publish <WPF_PROJECT_PATH> -f <WINDOWS_TFM> -c Release -r <WINDOWS_RUNTIME_IDENTIFIER> --self-contained true /p:UseWPF=true
 ```
 
 Dieser Beispielbefehl schließt die .NET-Runtime per `--self-contained true`
