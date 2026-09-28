@@ -45,7 +45,9 @@ Fehlerbehandlung selbst.
 
 Die App kann als eigenständige EXE veröffentlicht werden. Der Runtime-Identifier
 richtet sich nach der Zielplattform, typischerweise `win-x64` oder `win-arm64`.
-Beispiel für x64:
+Die Anwendung selbst kann als Single-File-EXE gebaut werden; **Dokan** bleibt
+dabei aber eine separate Laufzeit- bzw. Installer-Abhängigkeit. Beispiel für
+x64:
 
 ```powershell
 dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true
