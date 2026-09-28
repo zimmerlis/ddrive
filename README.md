@@ -53,7 +53,8 @@ notwendigen Voraussetzungen benötigt. Das Projekt selbst sollte dafür als
 Windows-Desktop-App, also z. B. mit dem `Microsoft.NET.Sdk.WindowsDesktop`,
 `net8.0-windows` und `UseWPF=true`, konfiguriert sein. Diese Einstellungen sind
 eine **geplante Anforderung** für das spätere WPF-Projekt in diesem Repository,
-nicht der aktuelle Stand. Beispielhafte `.csproj`-Konfiguration:
+nicht der aktuelle Stand. **Sie greifen erst, nachdem das geplante WPF-Projekt
+im Repository angelegt wurde.** Beispielhafte `.csproj`-Konfiguration:
 
 ```xml
 <Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
