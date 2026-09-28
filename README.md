@@ -78,7 +78,9 @@ dotnet publish <WPF_PROJECT_PATH> -f <WINDOWS_TFM> -c Release -r <WINDOWS_RUNTIM
 Dieser schematische Beispielbefehl gilt nur für das **später angelegte
 WPF-App-Projekt**, nicht für den aktuellen Repository-Stand. Er schließt die
 .NET-Runtime per `--self-contained true` mit ein. **Dokan** bleibt trotzdem
-eine externe Laufzeit- bzw. Installer-Abhängigkeit.
+eine externe Laufzeit- bzw. Installer-Abhängigkeit. Für eine WPF-Anwendung ist
+hierbei typischerweise ein **mehrteiliges Publish-Verzeichnis** zu erwarten und
+nicht automatisch eine einzelne distributierbare EXE-Datei.
 
 #### Packaging-Voraussetzungen
 
