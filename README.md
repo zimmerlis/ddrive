@@ -69,7 +69,7 @@ Beispielhafter Publish-Befehl für ein späteres x64-WPF-App-Projekt in
 PowerShell:
 
 ```powershell
-dotnet publish .\<pfad-zum-wpf-projekt>\dDrive.App.csproj -f net8.0-windows -c Release -r win-x64 --self-contained true /p:UseWPF=true /p:PublishSingleFile=true
+dotnet publish .\<pfad-zum-wpf-projekt>\dDrive.App.csproj -f net8.0-windows -c Release -r win-x64 --self-contained true /p:UseWPF=true
 ```
 
 Danach ist zusätzlich ein Installer-/Packaging-Schritt erforderlich, der
