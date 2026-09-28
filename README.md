@@ -64,7 +64,8 @@ nicht der aktuelle Stand. Beispielhafte `.csproj`-Konfiguration:
 </Project>
 ```
 
-Beispielhafter Publish-Befehl für ein späteres x64-WPF-App-Projekt:
+Beispielhafter Publish-Befehl für ein späteres x64-WPF-App-Projekt in
+PowerShell:
 
 ```powershell
 dotnet publish .\<pfad-zum-wpf-projekt>\dDrive.App.csproj -f net8.0-windows -c Release -r win-x64 --self-contained true /p:UseWPF=true /p:PublishSingleFile=true
