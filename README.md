@@ -51,10 +51,23 @@ Publish-Befehl beschreibt nur das Managed-App-Artefakt; für eine WPF-Tray-App
 mit Dokan wird zusätzlich ein Installer bzw. Packaging-Schritt für die
 notwendigen Voraussetzungen benötigt. Das Projekt selbst sollte dafür als
 Windows-Desktop-App, also z. B. mit dem `Microsoft.NET.Sdk.WindowsDesktop`,
-`net8.0-windows` und `UseWPF=true`, konfiguriert sein. Beispiel für x64:
+`net8.0-windows` und `UseWPF=true`, konfiguriert sein. Diese Einstellungen sind
+eine **geplante Anforderung** für das spätere WPF-Projekt in diesem Repository,
+nicht der aktuelle Stand. Beispielhafte `.csproj`-Konfiguration:
+
+```xml
+<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+</Project>
+```
+
+Beispielhafter Publish-Befehl für ein späteres x64-WPF-App-Projekt:
 
 ```powershell
-dotnet publish .\src\dDrive.App\dDrive.App.csproj -f net8.0-windows -c Release -r win-x64 --self-contained true /p:UseWPF=true /p:PublishSingleFile=true
+dotnet publish .\<pfad-zum-wpf-projekt>\dDrive.App.csproj -f net8.0-windows -c Release -r win-x64 --self-contained true /p:UseWPF=true /p:PublishSingleFile=true
 ```
 
 ## Empfohlene Architektur
