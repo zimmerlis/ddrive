@@ -54,13 +54,13 @@ nicht aus bereits ausführbarem Anwendungscode.
 #### Geplante WPF-Projekteinstellungen
 
 Das spätere App-Projekt sollte als Windows-Desktop-App, also z. B. mit dem
-`Microsoft.NET.Sdk.WindowsDesktop`, `net8.0-windows10.0.19041.0` und
+`Microsoft.NET.Sdk.WindowsDesktop`, `net8.0-windows10.0.17763.0` und
 `UseWPF=true`, konfiguriert sein. Beispielhafte `.csproj`-Konfiguration:
 
 ```xml
 <Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
   <PropertyGroup>
-    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <TargetFramework>net8.0-windows10.0.17763.0</TargetFramework>
     <UseWPF>true</UseWPF>
   </PropertyGroup>
 </Project>
