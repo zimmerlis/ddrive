@@ -49,7 +49,9 @@ Die Anwendung selbst kann als Single-File-EXE gebaut werden; **Dokan** bleibt
 dabei aber eine separate Laufzeit- bzw. Installer-Abhängigkeit. Der folgende
 Publish-Befehl beschreibt nur das Managed-App-Artefakt; für eine WPF-Tray-App
 mit Dokan wird zusätzlich ein Installer bzw. Packaging-Schritt für die
-notwendigen Voraussetzungen benötigt. Beispiel für x64:
+notwendigen Voraussetzungen benötigt. Das Projekt selbst sollte dafür als
+Windows-Desktop-App, also z. B. mit `net8.0-windows` und `UseWPF=true`,
+konfiguriert sein. Beispiel für x64:
 
 ```powershell
 dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true
