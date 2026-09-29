@@ -1,6 +1,16 @@
 # dDrive
 
+<p align="center">
+	<img src="src/dDrive.App/Assets/dDrive-256x256.png" alt="dDrive" width="256" />
+</p>
+
 dDrive is a Windows tray application for managing WebDAV and FTP connections as drive-oriented remote storage. It provides a native Windows WebDAV mount by default and can optionally use Rclone with WinFsp for WebDAV, FTP, SFTP, and SMB mounts.
+
+## Screenshots
+
+![dDrive main window](ddrive.png)
+
+![dDrive About dialog](about.png)
 
 ## Features
 
