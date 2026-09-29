@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.17763.0</TargetFramework>
+    <ApplicationIcon>Assets\dDrive.ico</ApplicationIcon>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Resource Include="Assets\dDrive.ico" />
+    <Resource Include="Assets\dDrive.svg" />
+    <Content Include="Assets\dDrive.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <ProjectReference Include="..\dDrive.Core\dDrive.Core.csproj" />
+    <ProjectReference Include="..\dDrive.Storage\dDrive.Storage.csproj" />
+    <ProjectReference Include="..\dDrive.Mounting\dDrive.Mounting.csproj" />
+    <PackageReference Include="WPF-UI" Version="4.3.0" />
+    <PackageReference Include="SharpVectors.Wpf" Version="1.8.6" />
+    <PackageReference Include="QRCoder" Version="1.6.0" />
+  </ItemGroup>
+</Project>

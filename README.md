@@ -1,183 +1,73 @@
-# ddrive
+# dDrive
 
-dDrive ist als Windows-Utility für **WebDAV-, FTP- und SFTP-Laufwerke** unter
-Windows 10 und 11 geplant.
+dDrive is a Windows tray application for managing WebDAV and FTP connections as drive-oriented remote storage. It provides a native Windows WebDAV mount by default and can optionally use Rclone with WinFsp for WebDAV, FTP, SFTP, and SMB mounts.
 
-## Ziel
+## Features
 
-Das Tool soll unter Windows 10 und 11 als Tray-Anwendung laufen und mehrere
-Remote-Verbindungen als Laufwerke einbinden können – ähnlich zu RaiDrive, aber
-fokussiert auf WebDAV, FTP und SFTP.
+- WPF tray application for Windows 10 and 11
+- Connection profiles for WebDAV and FTP by default
+- Optional Rclone support for WebDAV, FTP, SFTP, and SMB
+- Native Windows WebDAV mounting without an additional filesystem runtime
+- Persistent Rclone mounts that survive dDrive shutdown and are restored on the next start
+- Windows Credential Manager for passwords
+- JSON configuration under `%APPDATA%\\dDrive\\connections.json`
+- Import and export without passwords
+- Directory and metadata caching with limited transport retries
+- Dark/light theme, global startup and Rclone settings
+- English, Mandarin Chinese, Hindi, Spanish, and French UI selection
+- About dialog with project link and Buy Me a Coffee QR code
+- Portable self-contained Windows x64 single-file publishing
 
-## Empfohlener Technologie-Stack
+## Mounting
 
-Für dieses Projekt ist **C# mit .NET 8 (LTS)** die pragmatischste Wahl:
+Native mode uses the Windows WebClient service and the Windows network-drive API for WebDAV. The Windows WebClient service must be available for native WebDAV mounts.
 
-- **UI / Tray-App:** WPF
-- **Virtuelles Dateisystem / Laufwerks-Mount:** Dokan.NET
-- **SFTP:** SSH.NET
-- **FTP/FTPS:** FluentFTP
-- **WebDAV:** eigener Provider auf Basis von `HttpClient` statt dem nativen
-  Windows-WebDAV-Redirector
-- **Secrets:** Windows Credential Manager
-- **Konfiguration:** JSON-Datei unter `%AppData%`, Passwörter ausschließlich im
-  Credential Manager
+When global Rclone support is enabled, dDrive installs Rclone and WinFsp through WinGet after explicit user consent:
 
-## Warum diese Empfehlung?
-
-### 1. Windows-freundlich
-
-C#/.NET lässt sich sauber als EXE bauen, gut debuggen und einfach mit
-Windows-Funktionen wie Tray-Icon, Credential Manager und Installer verbinden.
-
-### 2. Stabilerer WebDAV-Weg als der Windows-Standard
-
-Der native WebDAV-Support von Windows ist oft die instabilste Komponente. Der
-sinnvollere Weg ist deshalb:
-
-- **kein** Mount über den Windows-WebDAV-Redirector
-- stattdessen ein **eigenes User-Mode-Dateisystem**
-- und ein **eigener WebDAV-Client** im Prozess
-
-Damit kontrolliert die Anwendung Timeouts, Retries, Caching, Locking und
-Fehlerbehandlung selbst.
-
-### 3. Gute Build- und Release-Pipeline
-
-#### Aktueller Repository-Status
-
-Das Repository enthält aktuell noch **kein buildbares WPF-Projekt**. Die
-folgenden Angaben beschreiben die geplante spätere Umsetzung. Der aktuelle
-Stand besteht im Wesentlichen aus Projekt- und Architektur-Dokumentation,
-nicht aus bereits ausführbarem Anwendungscode.
-
-#### Geplante WPF-Projekteinstellungen
-
-Das spätere App-Projekt sollte als Windows-Desktop-App, also z. B. mit dem
-`Microsoft.NET.Sdk.WindowsDesktop`, `net8.0-windows10.0.17763.0` und
-`UseWPF=true`, konfiguriert sein. Beispielhafte `.csproj`-Konfiguration:
-
-```xml
-<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
-  <PropertyGroup>
-    <TargetFramework>net8.0-windows10.0.17763.0</TargetFramework>
-    <UseWPF>true</UseWPF>
-  </PropertyGroup>
-</Project>
+```powershell
+winget install --id Rclone.Rclone -e --accept-source-agreements --accept-package-agreements
+winget install --id WinFsp.WinFsp -e --accept-source-agreements --accept-package-agreements
 ```
 
-#### Geplanter Publish-Schritt
+Rclone credentials are supplied at runtime. Passwords remain in Windows Credential Manager and are not written to the Rclone configuration file. An Rclone mount remains active when dDrive exits; explicitly disconnecting the profile terminates it and removes its temporary session data.
 
-Ein späteres x64-WPF-App-Projekt kann schematisch z. B. so veröffentlicht
-werden:
+## Configuration and Logs
+
+Connection settings and global preferences are stored at:
 
 ```text
-dotnet publish <WPF_PROJECT_PATH> -f <WINDOWS_TFM> -c Release -r win-x64 --self-contained true /p:UseWPF=true
+%APPDATA%\\dDrive\\connections.json
 ```
 
-Dieser schematische Beispielbefehl gilt nur für das **später angelegte
-WPF-App-Projekt**, nicht für den aktuellen Repository-Stand. Er schließt die
-.NET-Runtime per `--self-contained true` mit ein. **Dokan** bleibt trotzdem
-eine externe Laufzeit- bzw. Installer-Abhängigkeit. Beim **hier gezeigten
-Beispielbefehl** ist typischerweise ein **mehrteiliges Publish-Verzeichnis** zu
-erwarten; Single-File-Publishing wäre eine separate optionale Konfiguration.
+Application logs are stored at:
 
-#### Packaging-Voraussetzungen
+```text
+%LOCALAPPDATA%\\dDrive\\logs\\dDrive.jsonl
+```
 
-Zusätzlich ist ein Installer-/Packaging-Schritt erforderlich, der mindestens
-die WPF-App und die benötigte **Dokan**-Voraussetzung gemeinsam ausliefert,
-z. B. per MSI, WiX oder Inno Setup. Der Runtime-Identifier richtet sich dabei
-nach der Zielplattform, typischerweise `win-x64` oder `win-arm64`. Die
-gewählte Installer-/Runtime-Architektur muss dabei zur eingesetzten
-**Dokan**-Paketarchitektur passen.
+Rclone session metadata and diagnostics are stored temporarily at:
 
-## Empfohlene Architektur
+```text
+%LOCALAPPDATA%\\dDrive\\rclone\\
+```
 
-### Komponenten
+No original passwords are stored in these files.
 
-1. **Tray App**
-   - Startet im Hintergrund
-   - Zeigt Mount-Status
-   - Bietet Verbinden/Trennen
-   - Öffnet das Setup-Fenster
+## Build
 
-2. **Connection Manager**
-   - Verwaltet Host, Port, Protokoll, Laufwerksbuchstaben und Benutzername
-   - Speichert nur nicht-sensitive Metadaten lokal
-   - Liest und schreibt Passwörter über den Windows Credential Manager
+The repository contains a repeatable portable build command. Run `build.cmd` from the repository root. It increments the patch version, publishes a self-contained single-file Windows x64 executable, removes PDB files from the output, and writes the result to:
 
-3. **Mount Service**
-   - Bindet Verbindungen per Dokan.NET als Laufwerk ein
-   - Verwaltet mehrere gleichzeitige Mounts
-   - Hält Mount-Lebenszyklus und Reconnect-Logik
+```text
+artifacts\\publish\\portable-win-x64-profile\\dDrive.App.exe
+```
 
-4. **Protocol Provider**
-   - `IStorageBackend` als gemeinsame Schnittstelle
-   - `WebDavBackend`
-   - `FtpBackend`
-   - `SftpBackend`
+The portable executable includes the .NET runtime. Native WebDAV still requires the Windows WebClient service, while Rclone mode requires Rclone and WinFsp.
 
-5. **Cache / IO-Schicht**
-   - Directory-Listing-Cache
-   - Read-Ahead für häufige Datei-Lesezugriffe
-   - Optionaler Temp-Upload bei großen Dateien
+## Development
 
-## Datenmodell für Verbindungen
+```powershell
+dotnet build dDrive.sln
+dotnet test dDrive.sln
+```
 
-Je Verbindung sollten mindestens folgende Felder verwaltet werden:
-
-- Anzeigename
-- Protokoll (`webdav`, `ftp`, `sftp`)
-- Host
-- Port
-- Basis-Pfad
-- Laufwerksbuchstabe
-- Benutzername
-- Credential-Manager-Key
-- Optionen wie Read-Only, Auto-Mount, Timeout, TLS prüfen
-
-## MVP-Vorschlag
-
-Die erste Version sollte bewusst klein bleiben:
-
-### Phase 1
-
-- Tray-App
-- Verbindungen anlegen/bearbeiten/löschen
-- Passwort im Credential Manager speichern
-- SFTP als erstes stabiles Backend
-
-### Phase 2
-
-- WebDAV-Backend mit eigenem `HttpClient`-basierten Zugriff
-- FTP/FTPS-Backend
-- Mehrere parallele Mounts
-
-### Phase 3
-
-- Caching
-- Reconnect
-- Logging / Diagnoseansicht
-- Installer und Auto-Start
-
-## Alternativen
-
-### Go
-
-Gut für einzelne Binärdateien, aber für Windows-Tray-UI, Credential Manager und
-virtuelle Dateisysteme meist umständlicher als .NET.
-
-### Rust
-
-Sehr performant, aber deutlich höherer Implementierungsaufwand für ein
-Desktop-MVP.
-
-### C++/Win32
-
-Maximale Kontrolle, aber unnötig hoher Aufwand für dieses Projekt.
-
-## Empfehlung
-
-Wenn das Ziel ein realistisch umsetzbares, kompilierbares Windows-Tool ist,
-sollte dDrive als **WPF-Tray-Anwendung in C#/.NET 8 mit Dokan.NET, SSH.NET,
-FluentFTP und einem eigenen WebDAV-Provider** umgesetzt werden.
+The solution targets .NET 8 and contains the application, core, storage, mounting, and test projects.
