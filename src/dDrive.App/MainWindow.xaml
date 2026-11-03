@@ -12,6 +12,18 @@
                  WindowStartupLocation="CenterScreen"
                  Closing="Window_Closing"
                  Loaded="Window_Loaded">
+    <ui:FluentWindow.Resources>
+        <ContextMenu x:Key="ConnectionContextMenu">
+            <MenuItem Tag="connect" Header="Verbinden" Click="MountConnection_Click" />
+            <MenuItem Tag="disconnect" Header="Trennen" Click="UnmountConnection_Click" />
+            <MenuItem Tag="edit" Header="Bearbeiten" Click="EditConnection_Click" />
+            <Separator />
+            <MenuItem Tag="setDefault" Header="Als Standard setzen" Click="SetDefaultFromMenu_Click" />
+            <Separator />
+            <MenuItem Tag="duplicate" Header="Duplizieren" Click="DuplicateConnection_Click" />
+            <MenuItem Tag="delete" Header="Löschen" Click="DeleteConnectionFromMenu_Click" />
+        </ContextMenu>
+    </ui:FluentWindow.Resources>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -30,7 +42,7 @@
             <Border Grid.Row="0" Height="84" Margin="0,0,0,20" Padding="1" CornerRadius="10"
                 BorderThickness="1" BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}">
             <Grid>
-                <Border CornerRadius="9" Background="{DynamicResource SystemAccentColorSecondaryBrush}" Opacity="0.12" />
+                <Border CornerRadius="9" Background="{DynamicResource AppTintBrush}" Opacity="0.28" />
                 <Grid Margin="18,8">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
@@ -114,17 +126,69 @@
                              CanUserAddRows="False" IsReadOnly="True"
                              SelectionMode="Single" SelectionUnit="FullRow"
                              HeadersVisibility="Column" GridLinesVisibility="Horizontal"
-                             RowHeight="48" SelectionChanged="ConnectionsGrid_SelectionChanged">
+                             RowHeight="48" Background="Transparent"
+                             Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                             SelectionChanged="ConnectionsGrid_SelectionChanged"
+                             PreviewMouseRightButtonDown="ConnectionsGrid_PreviewMouseRightButtonDown">
+                    <ui:DataGrid.RowStyle>
+                        <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                            <Setter Property="Background" Value="Transparent" />
+                            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                            <Style.Triggers>
+                                <MultiTrigger>
+                                    <MultiTrigger.Conditions>
+                                        <Condition Property="IsMouseOver" Value="True" />
+                                        <Condition Property="IsSelected" Value="False" />
+                                    </MultiTrigger.Conditions>
+                                    <Setter Property="Background" Value="{DynamicResource ControlFillColorSecondaryBrush}" />
+                                </MultiTrigger>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter Property="Background" Value="{DynamicResource SystemAccentColorPrimaryBrush}" />
+                                    <Setter Property="Foreground" Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ui:DataGrid.RowStyle>
                     <ui:DataGrid.Columns>
+                        <DataGridTemplateColumn Header="Standard" Width="100">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding DefaultMark}" FontSize="16" Foreground="Gold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTemplateColumn Header="Icon" Width="50">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Image Source="{Binding IconSource}" Width="24" Height="24" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
                         <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="1.25*" />
                         <DataGridTextColumn Header="Protokoll" Binding="{Binding Protocol}" Width="110" />
                         <DataGridTextColumn Header="Server" Binding="{Binding Host}" Width="1.7*" />
                         <DataGridTextColumn Header="Remote-Pfad" Binding="{Binding RemotePath}" Width="1.15*" />
-                        <DataGridTextColumn Header="Laufwerk" Binding="{Binding DriveLetter, StringFormat={}{0}:}" Width="80" />
+                        <DataGridTemplateColumn Header="Laufwerk" Width="95">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Border CornerRadius="6" Padding="12,5" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                        <Grid>
+                                            <Border CornerRadius="6" Margin="-12,-5" Background="{DynamicResource AppTintBrush}" Opacity="0.35" />
+                                            <TextBlock Text="{Binding DriveLetter, StringFormat={}{0}:}" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
                         <DataGridTemplateColumn Header="Status" Width="125">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
-                                    <TextBlock Text="{Binding Status}" Foreground="{Binding StatusBrush}" VerticalAlignment="Center" />
+                                    <Border CornerRadius="10" Padding="12,5" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                        <Grid>
+                                            <Border CornerRadius="10" Margin="-12,-5" Background="{Binding StatusBackgroundBrush}" />
+                                            <TextBlock Text="{Binding Status}" Foreground="{Binding StatusBrush}" FontWeight="SemiBold" />
+                                        </Grid>
+                                    </Border>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
@@ -136,7 +200,7 @@
         <Border Grid.Row="3" Margin="0,14,0,0" Padding="1" CornerRadius="10"
                 BorderThickness="1" BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}">
             <Grid>
-                <Border CornerRadius="9" Background="{DynamicResource SystemAccentColorSecondaryBrush}" Opacity="0.09" />
+                <Border CornerRadius="9" Background="{DynamicResource AppTintBrush}" Opacity="0.16" />
                 <Grid Margin="12,8">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />

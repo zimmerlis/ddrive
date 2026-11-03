@@ -12,4 +12,8 @@ public sealed class AppConfiguration
     public bool HasDonated { get; init; }
     public string Language { get; init; } = "English";
     public bool UseDarkMode { get; init; } = true;
+    public string ColorScheme { get; init; } = "ocean";
+    public int MobilePopupWidth { get; init; } = 600;
+    public int MobilePopupHeight { get; init; } = 760;
+    public string MobilePopupPosition { get; init; } = "bottomright";
 }

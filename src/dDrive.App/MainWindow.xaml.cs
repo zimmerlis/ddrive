@@ -32,8 +32,12 @@ public partial class MainWindow : FluentWindow
     private readonly ObservableCollection<ConnectionListItem> _connections = [];
     private ICollectionView _connectionsView = null!;
     private readonly System.Drawing.Icon _trayApplicationIcon;
+    private System.Drawing.Icon? _trayCustomIcon;
     private readonly System.Windows.Forms.NotifyIcon _trayIcon;
     private readonly System.Windows.Forms.ContextMenuStrip _trayMenu = new();
+    private readonly ContextMenu _connectionMenu;
+    private readonly System.Windows.Forms.Timer _trayClickTimer = new();
+    private MobileWebWindow? _mobileWindow;
     private AppConfiguration _configuration = new();
     private bool _allowClose;
     private bool _isLoadingConfiguration;
@@ -45,6 +49,7 @@ public partial class MainWindow : FluentWindow
         _startHidden = startHidden;
         InitializeComponent();
         _connectionsView = CollectionViewSource.GetDefaultView(_connections);
+        _connectionMenu = (ContextMenu)FindResource("ConnectionContextMenu");
         _connectionsView.Filter = FilterConnection;
         _connections.CollectionChanged += (_, _) => UpdateConnectionCount();
         ConnectionsGrid.ItemsSource = _connectionsView;
@@ -61,7 +66,29 @@ public partial class MainWindow : FluentWindow
             ContextMenuStrip = _trayMenu,
             Visible = true
         };
-        _trayIcon.MouseDoubleClick += (_, _) => ShowWindow();
+        // Einfachklick öffnet die Mobilansicht verzögert, damit ein Doppelklick das Hauptfenster öffnen kann.
+        _trayClickTimer.Interval = System.Windows.Forms.SystemInformation.DoubleClickTime;
+        _trayClickTimer.Tick += (_, _) =>
+        {
+            _trayClickTimer.Stop();
+            OpenMobileView();
+        };
+        _trayIcon.MouseClick += (_, args) =>
+        {
+            if (args.Button == System.Windows.Forms.MouseButtons.Left)
+            {
+                _trayClickTimer.Stop();
+                _trayClickTimer.Start();
+            }
+        };
+        _trayIcon.MouseDoubleClick += (_, args) =>
+        {
+            if (args.Button == System.Windows.Forms.MouseButtons.Left)
+            {
+                _trayClickTimer.Stop();
+                ShowWindow();
+            }
+        };
     }
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
@@ -84,11 +111,15 @@ public partial class MainWindow : FluentWindow
                     RcloneEnabled = _configuration.RcloneEnabled,
                     HasDonated = _configuration.HasDonated,
                     Language = language,
-                    UseDarkMode = _configuration.UseDarkMode
+                    UseDarkMode = _configuration.UseDarkMode,
+                    ColorScheme = _configuration.ColorScheme,
+                    MobilePopupWidth = _configuration.MobilePopupWidth,
+                    MobilePopupHeight = _configuration.MobilePopupHeight,
+                    MobilePopupPosition = _configuration.MobilePopupPosition
                 };
             }
             LocalizationService.Apply(this, language);
-            ApplyTheme(_configuration.UseDarkMode);
+            ApplyTheme(_configuration.UseDarkMode, _configuration.ColorScheme);
             _connections.Clear();
             foreach (var connection in _configuration.Connections)
             {
@@ -97,15 +128,22 @@ public partial class MainWindow : FluentWindow
 
             _connectionsView.Refresh();
             ConnectionsGrid.Items.Refresh();
-            RefreshTrayMenu();
+            ReconcileDefaults();
+            RefreshIconsAndTray();
             ApplyTrayLanguage(_configuration.Language);
             StatusText.Text = $"{_connections.Count} Verbindung(en) geladen";
             _isLoadingConfiguration = false;
+
+            foreach (var item in _connections.Where(item => NeedsFavicon(item.Profile)))
+            {
+                _ = RefreshFaviconAsync(item);
+            }
 
             var restoredRcloneMounts = await _mountService.RestoreRcloneMountsAsync(_configuration.Connections);
             foreach (var item in _connections.Where(item => restoredRcloneMounts.Contains(item.Profile.Id)))
             {
                 item.SetStatus(LocalizationService.TranslateText("Verbunden", _configuration.Language), true);
+                ApplyDriveIcon(item);
             }
 
             var startMinimized = _startHidden || _configuration.StartMinimized;
@@ -204,9 +242,12 @@ public partial class MainWindow : FluentWindow
             return;
         }
 
-        _connections.Add(new ConnectionListItem(editor.Connection, _configuration.Language));
-        RefreshTrayMenu();
+        var added = new ConnectionListItem(editor.Connection, _configuration.Language);
+        _connections.Add(added);
+        ReconcileDefaults(editor.Connection.IsDefault ? editor.Connection.Id : null);
+        RefreshIconsAndTray();
         await SaveConfigurationAsync();
+        _ = RefreshFaviconAsync(added);
     }
 
     private async void EditConnection_Click(object sender, RoutedEventArgs e)
@@ -216,14 +257,9 @@ public partial class MainWindow : FluentWindow
             return;
         }
 
-        if (selected.IsMounted)
-        {
-            MessageBox.Show(this, "Trenne die Verbindung zuerst, bevor du ihre Einstellungen änderst.", "Verbindung aktiv", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
-
-        var editor = new ConnectionEditorWindow(_credentialStore, selected.Profile, _configuration.RcloneEnabled, _configuration.Language) { Owner = this };
-        if (editor.ShowDialog() != true)
+        var viewOnly = selected.IsMounted;
+        var editor = new ConnectionEditorWindow(_credentialStore, selected.Profile, _configuration.RcloneEnabled, _configuration.Language, viewOnly) { Owner = this };
+        if (editor.ShowDialog() != true || viewOnly)
         {
             return;
         }
@@ -241,8 +277,10 @@ public partial class MainWindow : FluentWindow
         }
 
         selected.UpdateProfile(editor.Connection);
-        RefreshTrayMenu();
+        ReconcileDefaults(editor.Connection.IsDefault ? editor.Connection.Id : null);
+        RefreshIconsAndTray();
         await SaveConfigurationAsync();
+        _ = RefreshFaviconAsync(selected);
     }
 
     private async Task DeleteConnectionAsync(ConnectionListItem selected)
@@ -264,7 +302,9 @@ public partial class MainWindow : FluentWindow
         }
 
         _connections.Remove(selected);
-        RefreshTrayMenu();
+        WebsiteIconService.DeleteCachedIcons(selected.Profile.Id);
+        ReconcileDefaults();
+        RefreshIconsAndTray();
         await SaveConfigurationAsync();
     }
 
@@ -488,6 +528,10 @@ public partial class MainWindow : FluentWindow
                 HasDonated = _configuration.HasDonated,
                 Language = _configuration.Language,
                 UseDarkMode = _configuration.UseDarkMode,
+                ColorScheme = _configuration.ColorScheme,
+                MobilePopupWidth = _configuration.MobilePopupWidth,
+                MobilePopupHeight = _configuration.MobilePopupHeight,
+                MobilePopupPosition = _configuration.MobilePopupPosition,
                 Connections = connections
             };
 
@@ -499,7 +543,13 @@ public partial class MainWindow : FluentWindow
                 _connections.Add(new ConnectionListItem(connection, _configuration.Language));
             }
 
-            RefreshTrayMenu();
+            ReconcileDefaults();
+            RefreshIconsAndTray();
+            foreach (var item in _connections.Where(item => NeedsFavicon(item.Profile)))
+            {
+                _ = RefreshFaviconAsync(item);
+            }
+
             StatusText.Text = "Konfiguration importiert";
         }
         catch (Exception exception)
@@ -571,6 +621,7 @@ public partial class MainWindow : FluentWindow
             RefreshTrayMenu();
             await _mountService.MountAsync(item.Profile, secret, _configuration.RcloneEnabled);
             item.SetStatus(LocalizationService.TranslateText("Verbunden", _configuration.Language), true);
+            ApplyDriveIcon(item);
             StatusText.Text = $"{item.Name} ist als {char.ToUpperInvariant(item.DriveLetter)}: eingebunden";
             if (!_configuration.HasDonated)
             {
@@ -606,6 +657,7 @@ public partial class MainWindow : FluentWindow
             var unmounted = await _mountService.UnmountAsync(selected.Profile.Id);
             if (unmounted)
             {
+                DriveIconRegistry.Remove(selected.DriveLetter);
                 selected.SetStatus(LocalizationService.TranslateText("Getrennt", _configuration.Language), false);
                 StatusText.Text = $"{selected.Name} wurde getrennt";
             }
@@ -637,6 +689,10 @@ public partial class MainWindow : FluentWindow
             HasDonated = _configuration.HasDonated,
             Language = _configuration.Language,
             UseDarkMode = _configuration.UseDarkMode,
+            ColorScheme = _configuration.ColorScheme,
+            MobilePopupWidth = _configuration.MobilePopupWidth,
+            MobilePopupHeight = _configuration.MobilePopupHeight,
+            MobilePopupPosition = _configuration.MobilePopupPosition,
             Connections = _connections.Select(item => item.Profile).ToList()
         };
 
@@ -662,20 +718,26 @@ public partial class MainWindow : FluentWindow
 
         foreach (var item in _connections)
         {
-            var menuItem = new System.Windows.Forms.ToolStripMenuItem($"{item.Name}  {char.ToUpperInvariant(item.DriveLetter)}:");
-            menuItem.Click += (_, _) =>
+            var label = $"{(item.IsDefault ? "★ " : string.Empty)}{item.Name}  {char.ToUpperInvariant(item.DriveLetter)}:";
+            var siteUri = WebsiteIconService.GetWebsiteUri(item.Profile);
+            if (siteUri is null)
             {
-                if (item.IsMounted)
-                {
-                    OpenDriveInExplorer(item.DriveLetter);
-                }
-                else
-                {
-                    ShowWindow();
-                }
-            };
+                var menuItem = new System.Windows.Forms.ToolStripMenuItem(label);
+                menuItem.Click += (_, _) => OpenDriveOrShowWindow(item);
+                _trayMenu.Items.Add(menuItem);
+                continue;
+            }
 
-            _trayMenu.Items.Add(menuItem);
+            var websiteMenuItem = new System.Windows.Forms.ToolStripMenuItem(label);
+            websiteMenuItem.DropDownItems.Add(new System.Windows.Forms.ToolStripMenuItem(
+                LocalizationService.TranslateText(item.IsMounted ? "Laufwerk öffnen" : "In dDrive anzeigen", _configuration.Language),
+                null,
+                (_, _) => OpenDriveOrShowWindow(item)));
+            websiteMenuItem.DropDownItems.Add(new System.Windows.Forms.ToolStripMenuItem(
+                LocalizationService.TranslateText("Webseite im Browser öffnen", _configuration.Language),
+                null,
+                (_, _) => OpenUri(siteUri)));
+            _trayMenu.Items.Add(websiteMenuItem);
         }
 
         var exitMenuItem = new System.Windows.Forms.ToolStripMenuItem("Beenden", null, async (_, _) => await ShutdownAsync())
@@ -683,6 +745,159 @@ public partial class MainWindow : FluentWindow
             Tag = "exit"
         };
         _trayMenu.Items.Add(exitMenuItem);
+    }
+
+    private void RefreshIconsAndTray()
+    {
+        foreach (var item in _connections)
+        {
+            item.RefreshIcon();
+        }
+
+        ConnectionsGrid.Items.Refresh();
+        UpdateTrayIcon();
+        RefreshTrayMenu();
+    }
+
+    private void ReconcileDefaults(Guid? preferredId = null)
+    {
+        var profiles = _connections.Select(item => item.Profile).ToList();
+        if (preferredId is Guid id)
+        {
+            profiles = ConnectionDefaults.SetDefault(profiles, id);
+        }
+
+        profiles = ConnectionDefaults.Normalize(profiles);
+        for (var index = 0; index < _connections.Count; index++)
+        {
+            if (_connections[index].Profile != profiles[index])
+            {
+                _connections[index].UpdateProfile(profiles[index]);
+            }
+        }
+    }
+
+    private static bool NeedsFavicon(ConnectionProfile profile) =>
+        WebsiteIconService.GetWebsiteUri(profile) is not null &&
+        !File.Exists(WebsiteIconService.GetFaviconCachePath(profile.Id));
+
+    private async Task RefreshFaviconAsync(ConnectionListItem item)
+    {
+        var profile = item.Profile;
+        try
+        {
+            var faviconPath = WebsiteIconService.GetFaviconCachePath(profile.Id);
+            if (File.Exists(faviconPath))
+            {
+                File.Delete(faviconPath);
+            }
+
+            var siteUri = WebsiteIconService.GetWebsiteUri(profile);
+            if (siteUri is not null)
+            {
+                await WebsiteIconService.DownloadFaviconAsync(siteUri, profile.Id, profile.VerifyTlsCertificate);
+            }
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError("Connection.Favicon", $"Das Favicon für '{profile.Name}' konnte nicht geladen werden.", exception);
+        }
+
+        RefreshIconsAndTray();
+        if (item.IsMounted)
+        {
+            ApplyDriveIcon(item);
+        }
+    }
+
+    private void ApplyDriveIcon(ConnectionListItem item)
+    {
+        try
+        {
+            var iconPath = WebsiteIconService.GetEffectiveIconPath(item.Profile);
+            if (iconPath is null)
+            {
+                DriveIconRegistry.Remove(item.DriveLetter);
+            }
+            else
+            {
+                DriveIconRegistry.Set(item.DriveLetter, iconPath);
+            }
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError("Connection.DriveIcon", $"Das Laufwerkssymbol für '{item.Name}' konnte nicht gesetzt werden.", exception);
+        }
+    }
+
+    private void UpdateTrayIcon()
+    {
+        var defaultItem = _connections.FirstOrDefault(item => item.Profile.IsDefault);
+        var iconPath = defaultItem is null ? null : WebsiteIconService.GetEffectiveIconPath(defaultItem.Profile);
+        System.Drawing.Icon? icon = null;
+        if (iconPath is not null)
+        {
+            try
+            {
+                icon = new System.Drawing.Icon(iconPath, 32, 32);
+            }
+            catch (Exception)
+            {
+                icon = null;
+            }
+        }
+
+        var previous = _trayCustomIcon;
+        _trayCustomIcon = icon;
+        _trayIcon.Icon = icon ?? _trayApplicationIcon;
+        previous?.Dispose();
+    }
+
+    private void OpenMobileView()
+    {
+        var defaultItem = _connections.FirstOrDefault(item => item.Profile.IsDefault);
+        var siteUri = defaultItem is null ? null : WebsiteIconService.GetWebsiteUri(defaultItem.Profile);
+        if (siteUri is null)
+        {
+            ShowWindow();
+            return;
+        }
+
+        _mobileWindow?.Close();
+        var iconPath = WebsiteIconService.GetEffectiveIconPath(defaultItem!.Profile);
+        var window = new MobileWebWindow(
+            siteUri,
+            _configuration.Language,
+            iconPath,
+            _configuration.MobilePopupWidth,
+            _configuration.MobilePopupHeight,
+            _configuration.MobilePopupPosition);
+        window.Closed += (_, _) =>
+        {
+            if (ReferenceEquals(_mobileWindow, window))
+            {
+                _mobileWindow = null;
+            }
+        };
+        _mobileWindow = window;
+        window.Show();
+    }
+
+    private void OpenDriveOrShowWindow(ConnectionListItem item)
+    {
+        if (item.IsMounted)
+        {
+            OpenDriveInExplorer(item.DriveLetter);
+        }
+        else
+        {
+            ShowWindow();
+        }
+    }
+
+    private static void OpenUri(Uri uri)
+    {
+        Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
     }
 
     private void ShowWindow()
@@ -778,10 +993,15 @@ public partial class MainWindow : FluentWindow
                 HasDonated = _configuration.HasDonated,
                 Language = settingsWindow.SelectedLanguage,
                 UseDarkMode = _configuration.UseDarkMode,
+                ColorScheme = settingsWindow.SelectedColorScheme,
+                MobilePopupWidth = settingsWindow.SelectedMobilePopupWidth,
+                MobilePopupHeight = settingsWindow.SelectedMobilePopupHeight,
+                MobilePopupPosition = settingsWindow.SelectedMobilePopupPosition,
                 Connections = _configuration.Connections
             };
             await _configurationStore.SaveAsync(updatedConfiguration);
             _configuration = updatedConfiguration;
+            ApplyTheme(_configuration.UseDarkMode, _configuration.ColorScheme);
             LocalizationService.Apply(this, _configuration.Language);
             ApplyTrayLanguage(_configuration.Language);
             StatusText.Text = "Settings saved";
@@ -851,6 +1071,10 @@ public partial class MainWindow : FluentWindow
             HasDonated = aboutWindow.HasDonated,
             Language = _configuration.Language,
             UseDarkMode = _configuration.UseDarkMode,
+            ColorScheme = _configuration.ColorScheme,
+            MobilePopupWidth = _configuration.MobilePopupWidth,
+            MobilePopupHeight = _configuration.MobilePopupHeight,
+            MobilePopupPosition = _configuration.MobilePopupPosition,
             Connections = _configuration.Connections
         };
         await _configurationStore.SaveAsync(updatedConfiguration);
@@ -862,7 +1086,7 @@ public partial class MainWindow : FluentWindow
         var previousConfiguration = _configuration;
         try
         {
-            ApplyTheme(useDarkMode);
+            ApplyTheme(useDarkMode, previousConfiguration.ColorScheme);
             var updatedConfiguration = new AppConfiguration
             {
                 SchemaVersion = previousConfiguration.SchemaVersion,
@@ -872,6 +1096,10 @@ public partial class MainWindow : FluentWindow
                 HasDonated = previousConfiguration.HasDonated,
                 Language = previousConfiguration.Language,
                 UseDarkMode = useDarkMode,
+                ColorScheme = previousConfiguration.ColorScheme,
+                MobilePopupWidth = previousConfiguration.MobilePopupWidth,
+                MobilePopupHeight = previousConfiguration.MobilePopupHeight,
+                MobilePopupPosition = previousConfiguration.MobilePopupPosition,
                 Connections = previousConfiguration.Connections
             };
             await _configurationStore.SaveAsync(updatedConfiguration);
@@ -882,22 +1110,57 @@ public partial class MainWindow : FluentWindow
         {
             _logger.LogError("Theme.Change", "Das Design konnte nicht geändert werden.", exception);
             _isLoadingConfiguration = true;
-            ApplyTheme(previousConfiguration.UseDarkMode);
+            ApplyTheme(previousConfiguration.UseDarkMode, previousConfiguration.ColorScheme);
             _isLoadingConfiguration = false;
             MessageBox.Show(this, $"Das Design konnte nicht geändert werden.\n\n{exception.Message}", "Design", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
-    private void ApplyTheme(bool useDarkMode)
+    private void ApplyTheme(bool useDarkMode, string colorScheme)
     {
         var theme = useDarkMode ? ApplicationTheme.Dark : ApplicationTheme.Light;
         ApplicationThemeManager.Apply(theme);
-        ApplicationAccentColorManager.Apply(System.Windows.Media.Color.FromRgb(73, 151, 176), theme);
+        ApplicationThemeManager.Apply(this);
+        if (useDarkMode)
+        {
+            ClearValue(System.Windows.Controls.Control.BackgroundProperty);
+        }
+        else
+        {
+            Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xF3, 0xF3, 0xF3));
+        }
+        ApplyAccentColor(ColorSchemes.FromId(colorScheme).AccentColor, useDarkMode);
         ThemeButton.Icon = new SymbolIcon(useDarkMode ? SymbolRegular.WeatherSunny20 : SymbolRegular.WeatherMoon20);
         ThemeButton.ToolTip = useDarkMode ? "Zum hellen Design wechseln" : "Zum dunklen Design wechseln";
         System.Windows.Automation.AutomationProperties.SetName(
             ThemeButton,
             useDarkMode ? "Zum hellen Design wechseln" : "Zum dunklen Design wechseln");
+    }
+
+    private static void ApplyAccentColor(System.Windows.Media.Color accent, bool useDarkMode)
+    {
+        var resources = System.Windows.Application.Current.Resources;
+        var luminance = 0.299 * accent.R + 0.587 * accent.G + 0.114 * accent.B;
+        var onAccent = luminance > 150 ? System.Windows.Media.Colors.Black : System.Windows.Media.Colors.White;
+        var tint = useDarkMode ? accent : BlendColor(accent, System.Windows.Media.Colors.White, 0.75);
+
+        SetColorResource(resources, "SystemAccentColorPrimary", accent);
+        SetColorResource(resources, "SystemAccentColorSecondary", accent);
+        SetColorResource(resources, "SystemAccentColorTertiary", accent);
+        SetColorResource(resources, "TextOnAccentFillColorPrimary", onAccent);
+        SetColorResource(resources, "AppTint", tint);
+    }
+
+    private static System.Windows.Media.Color BlendColor(System.Windows.Media.Color from, System.Windows.Media.Color to, double amount)
+    {
+        byte Mix(byte a, byte b) => (byte)(a + (b - a) * amount);
+        return System.Windows.Media.Color.FromRgb(Mix(from.R, to.R), Mix(from.G, to.G), Mix(from.B, to.B));
+    }
+
+    private static void SetColorResource(System.Windows.ResourceDictionary resources, string key, System.Windows.Media.Color color)
+    {
+        resources[key] = color;
+        resources[key + "Brush"] = new System.Windows.Media.SolidColorBrush(color);
     }
 
     private void SearchBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
@@ -943,6 +1206,180 @@ public partial class MainWindow : FluentWindow
         var isMounted = ConnectionsGrid.SelectedItem is ConnectionListItem selected && selected.IsMounted;
         ConnectButton.IsEnabled = hasSelection && !isMounted;
         DisconnectButton.IsEnabled = isMounted;
-        EditButton.IsEnabled = hasSelection && !isMounted;
+        EditButton.IsEnabled = hasSelection;
+    }
+
+    private void ConnectionsGrid_PreviewMouseRightButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        var row = FindVisualAncestor<DataGridRow>(e.OriginalSource as DependencyObject);
+        if (row is null)
+        {
+            ConnectionsGrid.SelectedItem = null;
+            return;
+        }
+
+        row.IsSelected = true;
+        UpdateConnectionContextMenu();
+        _connectionMenu.PlacementTarget = ConnectionsGrid;
+        _connectionMenu.IsOpen = true;
+        e.Handled = true;
+    }
+
+    private System.Windows.Controls.MenuItem FindMenuItem(string tag) =>
+        _connectionMenu.Items.OfType<System.Windows.Controls.MenuItem>().First(item => (string?)item.Tag == tag);
+
+    private void UpdateConnectionContextMenu()
+    {
+        var language = _configuration.Language;
+        var selected = ConnectionsGrid.SelectedItem as ConnectionListItem;
+        var hasSelection = selected is not null;
+        var isMounted = selected?.IsMounted ?? false;
+        var isDefault = selected?.IsDefault ?? false;
+
+        var connect = FindMenuItem("connect");
+        connect.Header = LocalizationService.TranslateText("Verbinden", language);
+        connect.IsEnabled = hasSelection && !isMounted;
+        var disconnect = FindMenuItem("disconnect");
+        disconnect.Header = LocalizationService.TranslateText("Trennen", language);
+        disconnect.IsEnabled = isMounted;
+        var edit = FindMenuItem("edit");
+        edit.Header = LocalizationService.TranslateText(isMounted ? "Ansehen" : "Bearbeiten", language);
+        edit.IsEnabled = hasSelection;
+        var setDefault = FindMenuItem("setDefault");
+        setDefault.Header = isDefault
+            ? $"★ {LocalizationService.TranslateText("Standard", language)}"
+            : LocalizationService.TranslateText("Als Standard setzen", language);
+        setDefault.IsEnabled = hasSelection && !isDefault;
+        var duplicate = FindMenuItem("duplicate");
+        duplicate.Header = LocalizationService.TranslateText("Duplizieren", language);
+        duplicate.IsEnabled = hasSelection;
+        var delete = FindMenuItem("delete");
+        delete.Header = LocalizationService.TranslateText("Löschen", language);
+        delete.IsEnabled = hasSelection && !isMounted;
+    }
+
+    private async void SetDefaultFromMenu_Click(object sender, RoutedEventArgs e)
+    {
+        if (ConnectionsGrid.SelectedItem is not ConnectionListItem selected || selected.IsDefault)
+        {
+            return;
+        }
+
+        ReconcileDefaults(selected.Profile.Id);
+        RefreshIconsAndTray();
+        await SaveConfigurationAsync();
+        _ = RefreshFaviconAsync(selected);
+    }
+
+    private async void DuplicateConnection_Click(object sender, RoutedEventArgs e)
+    {
+        if (ConnectionsGrid.SelectedItem is not ConnectionListItem selected)
+        {
+            return;
+        }
+
+        var source = selected.Profile;
+        var driveLetter = FindFreeDriveLetter();
+        if (driveLetter is null)
+        {
+            MessageBox.Show(this, "Es ist kein freier Laufwerksbuchstabe verfügbar.", "Laufwerkskonflikt", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var newId = Guid.NewGuid();
+        var name = UniqueConnectionName($"{source.Name} (Kopie)");
+        var credentialKey = $"dDrive:{name}";
+
+        try
+        {
+            using var secret = _credentialStore.Read(source.WinCredManagerEntry);
+            if (secret is not null)
+            {
+                _credentialStore.Save(credentialKey, secret);
+            }
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(this, $"Das gespeicherte Passwort konnte nicht kopiert werden.\n\n{exception.Message}", "Credential-Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
+            return;
+        }
+
+        var customIconPath = source.CustomIconPath is { } iconPath && File.Exists(iconPath)
+            ? WebsiteIconService.ImportCustomIcon(iconPath, newId)
+            : null;
+
+        var copy = source with
+        {
+            Id = newId,
+            Name = name,
+            DriveLetter = driveLetter.Value,
+            WinCredManagerEntry = credentialKey,
+            IsDefault = false,
+            CustomIconPath = customIconPath
+        };
+
+        var item = new ConnectionListItem(copy, _configuration.Language);
+        _connections.Add(item);
+        ConnectionsGrid.SelectedItem = item;
+        RefreshIconsAndTray();
+        await SaveConfigurationAsync();
+        _ = RefreshFaviconAsync(item);
+    }
+
+    private async void DeleteConnectionFromMenu_Click(object sender, RoutedEventArgs e)
+    {
+        if (ConnectionsGrid.SelectedItem is not ConnectionListItem selected)
+        {
+            return;
+        }
+
+        var answer = MessageBox.Show(this, $"Verbindung \"{selected.Name}\" wirklich löschen?", "Verbindung löschen", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+        if (answer != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        await DeleteConnectionAsync(selected);
+    }
+
+    private string UniqueConnectionName(string baseName)
+    {
+        var candidate = baseName;
+        var counter = 2;
+        while (_connections.Any(item => string.Equals(item.Name, candidate, StringComparison.OrdinalIgnoreCase)))
+        {
+            candidate = $"{baseName} {counter++}";
+        }
+
+        return candidate;
+    }
+
+    private char? FindFreeDriveLetter()
+    {
+        var used = _connections.Select(item => char.ToUpperInvariant(item.DriveLetter)).ToHashSet();
+        for (var letter = 'Z'; letter >= 'D'; letter--)
+        {
+            if (!used.Contains(letter))
+            {
+                return letter;
+            }
+        }
+
+        return null;
+    }
+
+    private static T? FindVisualAncestor<T>(DependencyObject? current) where T : DependencyObject
+    {
+        while (current is not null)
+        {
+            if (current is T match)
+            {
+                return match;
+            }
+
+            current = System.Windows.Media.VisualTreeHelper.GetParent(current);
+        }
+
+        return null;
     }
 }

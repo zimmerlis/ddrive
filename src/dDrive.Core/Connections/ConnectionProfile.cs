@@ -13,6 +13,8 @@ public sealed record ConnectionProfile
     public string WinCredManagerEntry { get; init; } = string.Empty;
     public bool ReadOnly { get; init; }
     public bool AutoMount { get; init; }
+    public bool IsDefault { get; init; }
+    public string? CustomIconPath { get; init; }
     public bool UseTls { get; init; } = true;
     public bool VerifyTlsCertificate { get; init; } = true;
     public int TimeoutSeconds { get; init; } = 30;

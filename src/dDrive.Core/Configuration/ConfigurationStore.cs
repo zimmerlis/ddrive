@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
+using dDrive.Core.Connections;
 
 namespace dDrive.Core.Configuration;
 
@@ -40,7 +41,11 @@ public sealed class ConfigurationStore
         var document = await JsonNode.ParseAsync(stream, cancellationToken: cancellationToken)
             ?? throw new InvalidDataException("Die Konfigurationsdatei enthält kein JSON.");
         MigrateCredentialEntries(document);
-        return document.Deserialize<AppConfiguration>(SerializerOptions) ?? new AppConfiguration();
+        var configuration = document.Deserialize<AppConfiguration>(SerializerOptions) ?? new AppConfiguration();
+        var normalized = ConnectionDefaults.Normalize(configuration.Connections);
+        configuration.Connections.Clear();
+        configuration.Connections.AddRange(normalized);
+        return configuration;
     }
 
     private static void MigrateCredentialEntries(JsonNode document)
@@ -143,6 +148,7 @@ public sealed class ConfigurationStore
                 connection.Username,
                 connection.ReadOnly,
                 connection.AutoMount,
+                connection.IsDefault,
                 connection.UseTls,
                 connection.VerifyTlsCertificate,
                 connection.TimeoutSeconds

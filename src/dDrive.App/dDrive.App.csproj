@@ -10,6 +10,7 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35" />
     <Resource Include="Assets\dDrive.ico" />
     <Resource Include="Assets\dDrive.svg" />
     <Content Include="Assets\dDrive.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />

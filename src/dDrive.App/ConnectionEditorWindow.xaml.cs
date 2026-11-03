@@ -1,5 +1,7 @@
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media.Imaging;
 using System.Security;
 using dDrive.Core.Connections;
 using dDrive.Core.Security;
@@ -16,19 +18,25 @@ public partial class ConnectionEditorWindow : FluentWindow
     private readonly ConnectionProfile? _original;
     private readonly ISecretStore _secretStore;
     private bool _isInitializing;
+    private string? _existingIconPath;
+    private string? _selectedIconFile;
+    private bool _iconReset;
 
     public ConnectionProfile Connection { get; private set; } = new();
     public bool DeleteRequested { get; private set; }
 
-    public ConnectionEditorWindow(ISecretStore secretStore, ConnectionProfile? connection = null, bool rcloneEnabled = false, string language = "English")
+    public ConnectionEditorWindow(ISecretStore secretStore, ConnectionProfile? connection = null, bool rcloneEnabled = false, string language = "English", bool viewOnly = false)
     {
         _isInitializing = true;
         InitializeComponent();
         LocalizationService.Apply(this, language);
         _secretStore = secretStore;
         _original = connection;
-        DialogTitle.Text = connection is null ? "Neue Verbindung" : "Verbindung bearbeiten";
-        DeleteConnectionButton.Visibility = connection is null ? Visibility.Collapsed : Visibility.Visible;
+        DialogTitle.Text = connection is null
+            ? "Neue Verbindung"
+            : viewOnly
+                ? LocalizationService.TranslateText("Verbindung ansehen", language)
+                : "Verbindung bearbeiten";
         DeleteConnectionButton.Visibility = connection is null ? Visibility.Collapsed : Visibility.Visible;
         SftpProtocolItem.Visibility = rcloneEnabled ? Visibility.Visible : Visibility.Collapsed;
         SmbProtocolItem.Visibility = rcloneEnabled ? Visibility.Visible : Visibility.Collapsed;
@@ -52,8 +60,97 @@ public partial class ConnectionEditorWindow : FluentWindow
         AutoMountCheckBox.IsChecked = connection?.AutoMount ?? false;
         VerifyTlsCheckBox.IsChecked = connection?.VerifyTlsCertificate ?? true;
         UseTlsCheckBox.IsChecked = connection?.UseTls ?? true;
+        DefaultConnectionCheckBox.IsChecked = connection?.IsDefault ?? false;
+        _existingIconPath = connection?.CustomIconPath ?? (connection is null ? null : WebsiteIconService.GetEffectiveIconPath(connection));
+        LoadIconPreview(_existingIconPath);
         UpdateSynologyOption(protocol, connection?.Port ?? DefaultPort(protocol));
+        if (viewOnly && connection is not null)
+        {
+            ApplyViewOnlyMode(language);
+        }
         _isInitializing = false;
+    }
+
+    private void ApplyViewOnlyMode(string language)
+    {
+        FormGrid.IsEnabled = false;
+        ViewOnlyNoticeText.Text = LocalizationService.TranslateText("Die Verbindung ist aktiv. Zum Ändern zuerst trennen.", language);
+        ViewOnlyNoticeText.Visibility = Visibility.Visible;
+        SaveButton.Visibility = Visibility.Collapsed;
+        DeleteConnectionButton.Visibility = Visibility.Collapsed;
+        CancelButton.Content = LocalizationService.TranslateText("Schließen", language);
+        CancelButton.IsDefault = true;
+    }
+
+    private void ChooseIcon_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Filter = "Bilddateien (*.ico;*.png;*.jpg;*.gif;*.bmp)|*.ico;*.png;*.jpg;*.gif;*.bmp",
+            Title = "Icon wählen",
+        };
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        _selectedIconFile = dialog.FileName;
+        _iconReset = false;
+        LoadIconPreview(_selectedIconFile);
+    }
+
+    private void ResetIcon_Click(object sender, RoutedEventArgs e)
+    {
+        _selectedIconFile = null;
+        _iconReset = true;
+        var faviconPath = _original is null ? null : WebsiteIconService.GetFaviconCachePath(_original.Id);
+        LoadIconPreview(faviconPath is not null && File.Exists(faviconPath) ? faviconPath : null);
+    }
+
+    private string? ResolveCustomIconPath(Guid connectionId)
+    {
+        if (_iconReset)
+        {
+            try
+            {
+                File.Delete(WebsiteIconService.GetCustomIconCachePath(connectionId));
+            }
+            catch (IOException)
+            {
+            }
+            catch (UnauthorizedAccessException)
+            {
+            }
+
+            return null;
+        }
+
+        if (_selectedIconFile is not null)
+        {
+            return WebsiteIconService.ImportCustomIcon(_selectedIconFile, connectionId) ?? _existingIconPath;
+        }
+
+        return _original?.CustomIconPath;
+    }
+
+    private void LoadIconPreview(string? path)
+    {
+        IconPreviewImage.Source = null;
+        if (string.IsNullOrEmpty(path) || !File.Exists(path))
+        {
+            return;
+        }
+
+        try
+        {
+            var frame = BitmapFrame.Create(new Uri(path), BitmapCreateOptions.None, BitmapCacheOption.OnLoad);
+            frame.Freeze();
+            IconPreviewImage.Source = frame;
+        }
+        catch (Exception)
+        {
+            IconPreviewImage.Source = null;
+        }
     }
 
     private void ProtocolComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -135,6 +232,7 @@ public partial class ConnectionEditorWindow : FluentWindow
 
         var connectionId = _original?.Id ?? Guid.NewGuid();
         var protocol = GetSelectedProtocol();
+        var customIconPath = ResolveCustomIconPath(connectionId);
         Connection = new ConnectionProfile
         {
             Id = connectionId,
@@ -150,6 +248,8 @@ public partial class ConnectionEditorWindow : FluentWindow
             AutoMount = AutoMountCheckBox.IsChecked == true,
             UseTls = UseTlsCheckBox.IsChecked == true,
             VerifyTlsCertificate = VerifyTlsCheckBox.IsChecked == true,
+            IsDefault = DefaultConnectionCheckBox.IsChecked == true,
+            CustomIconPath = customIconPath,
         };
 
         try
